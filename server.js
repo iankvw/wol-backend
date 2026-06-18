@@ -40,7 +40,7 @@ const oneHourLimiter = rateLimit({
 /**
  * API 라우팅 엔드포인트 (/api/v1/wol)
  */
-app.use('/api/v1/wol', tenSecondsLimiter, oneHourLimiter);
+app.use('/', tenSecondsLimiter, oneHourLimiter);
 
 // ============================================================================
 // WOL Backend Error Handling & Response Branching
@@ -104,7 +104,7 @@ const sendMagicPacket = (req, res, targetIp, macAddress, targetPort) => {
 /**
  * [POST] 웹 브라우저 UI 전용 API 엔드포인트
  */
-app.post('/api/v1/wol', (req, res) => {
+app.post('/', (req, res) => {
     const { targetIp, macAddress, port } = req.body;
     const targetPort = port ? parseInt(port, 10) : 9;
     sendMagicPacket(req, res, targetIp, macAddress, targetPort);
@@ -113,7 +113,7 @@ app.post('/api/v1/wol', (req, res) => {
 /**
  * [GET] 바로가기 전용 API 엔드포인트
  */
-app.get('/api/v1/wol', (req, res) => {
+app.get('/', (req, res) => {
     const { ip: targetIp, mac: macAddress, port } = req.query;
     const targetPort = port ? parseInt(port, 10) : 9;
     sendMagicPacket(req, res, targetIp, macAddress, targetPort);
