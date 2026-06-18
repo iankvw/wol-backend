@@ -40,7 +40,7 @@ const oneHourLimiter = rateLimit({
 /**
  * API 라우팅 엔드포인트 (/api/v1/wol)
  */
-app.use('/', tenSecondsLimiter, oneHourLimiter);
+app.use('*', tenSecondsLimiter, oneHourLimiter);
 
 // ============================================================================
 // WOL Backend Error Handling & Response Branching
@@ -49,11 +49,11 @@ app.use('/', tenSecondsLimiter, oneHourLimiter);
 // 브라우저 바로가기(GET)를 통한 접근 시에는 UI/UX를 고려하여 HTML 렌더링을 제공합니다.
 // ============================================================================
 const sendMagicPacket = (req, res, targetIp, macAddress, targetPort) => {
-    
+
     // [Helper 함수] 에러 발생 시 HTTP Method에 맞춰 응답을 동적으로 포장
     const sendError = (statusCode, message) => {
         console.error(`[Error] ${message}`);
-        
+
         if (req.method === 'POST') {
             // 웹 UI 요청 시: 모달창 처리를 위한 JSON 반환
             return res.status(statusCode).json({ success: false, message });
@@ -85,7 +85,7 @@ const sendMagicPacket = (req, res, targetIp, macAddress, targetPort) => {
             return sendError(500, `서버 오류로 전송에 실패했습니다. (${error.message})`);
         }
         console.log(`[Success] Magic Packet 송출 완료 - Target IP: ${targetIp}, MAC: ${macAddress}`);
-        
+
         // 성공 시 정상 응답 분기
         if (req.method === 'POST') {
             return res.status(200).json({ success: true, message: "PC에 신호를 보냈습니다." });
@@ -104,7 +104,7 @@ const sendMagicPacket = (req, res, targetIp, macAddress, targetPort) => {
 /**
  * [POST] 웹 브라우저 UI 전용 API 엔드포인트
  */
-app.post('/', (req, res) => {
+app.post('*', (req, res) => {
     const { targetIp, macAddress, port } = req.body;
     const targetPort = port ? parseInt(port, 10) : 9;
     sendMagicPacket(req, res, targetIp, macAddress, targetPort);
@@ -113,7 +113,7 @@ app.post('/', (req, res) => {
 /**
  * [GET] 바로가기 전용 API 엔드포인트
  */
-app.get('/', (req, res) => {
+app.get('*', (req, res) => {
     const { ip: targetIp, mac: macAddress, port } = req.query;
     const targetPort = port ? parseInt(port, 10) : 9;
     sendMagicPacket(req, res, targetIp, macAddress, targetPort);
