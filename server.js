@@ -44,21 +44,16 @@ app.use('*', tenSecondsLimiter, oneHourLimiter);
 
 // ============================================================================
 // WOL Backend Error Handling & Response Branching
-//
-// 클라이언트가 API를 직접 호출(POST)하는 경우 표준 JSON 규격을 반환하며,
-// 브라우저 바로가기(GET)를 통한 접근 시에는 UI/UX를 고려하여 HTML 렌더링을 제공합니다.
 // ============================================================================
 const sendMagicPacket = (req, res, targetIp, macAddress, targetPort) => {
 
-    // [Helper 함수] 에러 발생 시 HTTP Method에 맞춰 응답을 동적으로 포장
+    // [Helper 함수] HTTP Method에 맞추어 응답 포맷을 동적으로 생성 및 반환합니다.
     const sendError = (statusCode, message) => {
         console.error(`[Error] ${message}`);
 
         if (req.method === 'POST') {
-            // 웹 UI 요청 시: 모달창 처리를 위한 JSON 반환
             return res.status(statusCode).json({ success: false, message });
         } else {
-            // 바로가기(GET) 요청 시: 시각적 피드백을 위한 에러 페이지 렌더링
             const errorHtml = `
                 <div style="display:flex; justify-content:center; align-items:center; height:100vh; background-color:#f8f9fa; font-family:sans-serif;">
                     <div style="background:white; padding:40px; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.1); text-align:center;">
@@ -74,31 +69,48 @@ const sendMagicPacket = (req, res, targetIp, macAddress, targetPort) => {
         }
     };
 
-    // 파라미터 유효성 검사 (Validation)
+    // 1. 파라미터 누락 유효성 검사 (Payload Validation)
     if (!macAddress || !targetIp) {
         return sendError(400, "IP 또는 MAC 주소가 누락되었습니다.");
     }
 
-    // UDP Magic Packet 브로드캐스트 수행
-    wol.wake(macAddress, { address: targetIp, port: targetPort }, (error) => {
-        if (error) {
-            return sendError(500, `서버 오류로 전송에 실패했습니다. (${error.message})`);
-        }
-        console.log(`[Success] Magic Packet 송출 완료 - Target IP: ${targetIp}, MAC: ${macAddress}`);
+    // 2. MAC 주소 형식 사전 검증 (Regex Validation)
+    const macRegex = /^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$|^([0-9A-Fa-f]{12})$/;
+    
+    if (!macRegex.test(macAddress)) {
+        return sendError(400, "유효하지 않은 MAC 주소 형식입니다.");
+    }
 
-        // 성공 시 정상 응답 분기
-        if (req.method === 'POST') {
-            return res.status(200).json({ success: true, message: "PC에 신호를 보냈습니다." });
-        } else {
-            const htmlResponse = `
-                <script>
-                    window.close();
-                    history.back();
-                </script>
-            `;
-            return res.status(200).send(htmlResponse);
-        }
-    });
+    // 3. MAC 주소 정규화 (Normalization)
+    let formattedMac = macAddress;
+    if (formattedMac.length === 12) {
+        // 정규식을 이용하여 2자리 단위로 끊은 뒤 콜론(:)으로 결합합니다.
+        formattedMac = formattedMac.match(/.{1,2}/g).join(':');
+    }
+
+    // 4. UDP Magic Packet 브로드캐스트 수행 및 예외 처리
+    try {
+        wol.wake(formattedMac, { address: targetIp, port: targetPort }, (error) => {
+            if (error) {
+                return sendError(500, `서버 오류로 전송에 실패했습니다. (${error.message})`);
+            }
+            console.log(`[Success] Magic Packet 송출 완료 - Target IP: ${targetIp}, MAC: ${formattedMac}`);
+
+            if (req.method === 'POST') {
+                return res.status(200).json({ success: true, message: "PC에 신호를 보냈습니다." });
+            } else {
+                const htmlResponse = `
+                    <script>
+                        window.close();
+                        history.back();
+                    </script>
+                `;
+                return res.status(200).send(htmlResponse);
+            }
+        });
+    } catch (err) {
+        return sendError(400, `잘못된 MAC 주소 요청입니다. (${err.message})`);
+    }
 };
 
 /**
